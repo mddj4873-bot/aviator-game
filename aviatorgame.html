@@ -1,0 +1,827 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aviator Crash Game - Secure Version</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Jura:wght@500;700;900&family=Roboto:wght@400;700;900&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100dvh;
+            overflow: hidden;
+        }
+
+        #app {
+            width: 100%;
+            max-width: 500px;
+            height: 100%;
+            background-color: #1b1c27;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* HEADER */
+        #header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            background-color: #12131a;
+            border-bottom: 2px solid #2d2f40;
+            z-index: 10;
+        }
+
+        .logo {
+            font-family: 'Jura', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: #e91e63;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .logo svg {
+            width: 24px;
+            height: 24px;
+            fill: #e91e63;
+        }
+
+        .balance-box {
+            font-size: 1.1rem;
+            font-weight: 900;
+            color: #28a745;
+            background: rgba(40, 167, 69, 0.1);
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(40, 167, 69, 0.3);
+        }
+
+        /* GAME AREA */
+        #game-area {
+            flex: 1 1 auto;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #111218 0%, #1c1e2a 100%);
+            border-bottom: 2px solid #2d2f40;
+        }
+
+        #canvas-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* PLANE SVG & ANIMATION */
+        #plane-container {
+            position: absolute;
+            width: 80px;
+            height: 50px;
+            transform-origin: center;
+            z-index: 10;
+            bottom: 0;
+            left: 0;
+            transform: translate(10px, -20px);
+            transition: opacity 0.3s ease;
+        }
+
+        .propeller {
+            transform-origin: 15% 50%;
+            animation: spin 0.05s linear infinite;
+        }
+
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+
+        /* UI OVERLAYS */
+        #multiplier-display {
+            position: absolute;
+            top: 35%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Jura', sans-serif;
+            font-size: 4.5rem;
+            font-weight: 900;
+            color: #ffffff;
+            z-index: 5;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.8);
+            transition: color 0.2s ease, transform 0.1s ease;
+        }
+
+        #status-message {
+            position: absolute;
+            top: 15%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: 'Jura', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 900;
+            z-index: 5;
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 20px;
+            border-radius: 20px;
+            white-space: nowrap;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        /* LOADING BAR (WAITING STATE) */
+        #loading-container {
+            position: absolute;
+            top: 55%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80%;
+            text-align: center;
+            z-index: 6;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        #loading-text {
+            font-family: 'Jura', sans-serif;
+            font-size: 1.2rem;
+            color: #e91e63;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+
+        #loading-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        #loading-bar-fill {
+            width: 100%;
+            height: 100%;
+            background: #e91e63;
+            border-radius: 4px;
+            transform-origin: left;
+        }
+
+        /* TEXT COLORS */
+        .text-red { color: #ff3b3b !important; }
+        .text-green { color: #28a745 !important; }
+        .text-white { color: #ffffff !important; }
+
+        /* CONTROLS AREA */
+        #controls {
+            padding: 15px;
+            background-color: #171821;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            height: 220px;
+            justify-content: center;
+        }
+
+        .bet-adjust {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #0d0e14;
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #2d2f40;
+        }
+
+        .btn-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: #2d2f40;
+            color: white;
+            font-size: 1.5rem;
+            font-weight: bold;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-circle:active {
+            background: #464960;
+        }
+
+        .bet-input-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .bet-input-wrapper label {
+            font-size: 0.75rem;
+            color: #8b8c98;
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 2px;
+        }
+
+        .bet-input-wrapper div {
+            display: flex;
+            align-items: center;
+        }
+
+        .bet-input-wrapper span {
+            color: #8b8c98;
+            font-weight: 900;
+            font-size: 1.2rem;
+            margin-right: 2px;
+        }
+
+        input[type="number"] {
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 1.5rem;
+            font-weight: 900;
+            width: 100px;
+            text-align: center;
+            outline: none;
+            font-family: 'Jura', sans-serif;
+        }
+
+        /* BIG ACTION BUTTON */
+        #btn-action {
+            width: 100%;
+            height: 80px;
+            border: none;
+            border-radius: 15px;
+            font-family: 'Jura', sans-serif;
+            font-size: 1.8rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: transform 0.1s, background 0.3s;
+            box-shadow: 0 6px 0 rgba(0,0,0,0.4);
+        }
+
+        #btn-action:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0,0,0,0.4);
+        }
+
+        .btn-green {
+            background-color: #28a745;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+        }
+        
+        .btn-red {
+            background-color: #dc3545;
+            color: white;
+        }
+
+        .btn-orange {
+            background-color: #ff9800;
+            color: white;
+        }
+
+        .btn-disabled {
+            background-color: #2d2f40;
+            color: #6c6d7a;
+            pointer-events: none;
+            box-shadow: 0 6px 0 #1a1b26 !important;
+        }
+
+        .btn-subtext {
+            font-size: 1rem;
+            font-weight: 700;
+            opacity: 0.9;
+        }
+
+        /* EFFECTS */
+        .profit-float {
+            position: absolute;
+            color: #28a745;
+            font-weight: 900;
+            font-size: 2rem;
+            font-family: 'Jura', sans-serif;
+            pointer-events: none;
+            animation: floatUp 1.5s ease-out forwards;
+            z-index: 20;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -80px) scale(1.2); }
+        }
+
+        .shake {
+            animation: shakeAnim 0.4s cubic-bezier(.36,.07,.19,.97) both;
+        }
+
+        @keyframes shakeAnim {
+            10%, 90% { transform: translate(-50%, -50%) translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate(-50%, -50%) translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate(-50%, -50%) translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate(-50%, -50%) translate3d(6px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="app">
+        <!-- HEADER -->
+        <div id="header">
+            <div class="logo">
+                <svg viewBox="0 0 24 24"><path d="M22 16v-2l-8.5-5V3.5c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5V9L2 14v2l8.5-2.5V19L8 20.5V22l4-1 4 1v-1.5L13.5 19v-5.5L22 16z"/></svg>
+                AVIATOR
+            </div>
+            <div class="balance-box">
+                $<span id="balance">0.00</span>
+            </div>
+        </div>
+
+        <!-- GAME AREA -->
+        <div id="game-area">
+            <div id="canvas-container">
+                <canvas id="gameCanvas"></canvas>
+            </div>
+            
+            <!-- BEAUTIFUL RED JET SVG -->
+            <div id="plane-container">
+                <svg viewBox="0 0 512 512" width="100%" height="100%">
+                    <path id="flame" d="M10,280 Q-20,256 10,230 Q0,256 10,280" fill="#ff9800">
+                        <animate attributeName="d" values="M10,280 Q-20,256 10,230 Q0,256 10,280; M15,285 Q-30,256 15,225 Q-5,256 15,285; M10,280 Q-20,256 10,230 Q0,256 10,280" dur="0.1s" repeatCount="indefinite" />
+                    </path>
+                    <path d="M220,256 L150,150 L200,150 L280,256 Z" fill="#b01026"/>
+                    <path d="M220,256 L150,362 L200,362 L280,256 Z" fill="#b01026"/>
+                    <path d="M40,256 Q40,230 150,230 L400,230 Q480,230 490,256 Q480,282 400,282 L150,282 Q40,282 40,256 Z" fill="#e91e63"/>
+                    <path d="M300,230 Q350,200 380,230 Z" fill="#ffffff" opacity="0.6"/>
+                    <path d="M250,256 L180,110 L230,110 L330,256 Z" fill="#ff2a75"/>
+                    <path d="M250,256 L180,402 L230,402 L330,256 Z" fill="#ff2a75"/>
+                    <path d="M80,256 L40,160 L80,160 L120,256 Z" fill="#ff2a75"/>
+                    <circle cx="490" cy="256" r="8" fill="#111"/>
+                    <g class="propeller" style="transform-origin: 490px 256px;">
+                        <path d="M490,246 L490,200 L495,200 L495,246 Z" fill="#ccc"/>
+                        <path d="M490,266 L490,312 L495,312 L495,266 Z" fill="#ccc"/>
+                    </g>
+                </svg>
+            </div>
+
+            <!-- OVERLAYS -->
+            <div id="multiplier-display">1.00x</div>
+            <div id="status-message">WAITING FOR NEXT ROUND</div>
+            
+            <div id="loading-container">
+                <div id="loading-text">NEXT ROUND IN <span id="time-left">0.0</span>s</div>
+                <div id="loading-bar-bg">
+                    <div id="loading-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLS -->
+        <div id="controls">
+            <div class="bet-adjust">
+                <button class="btn-circle" id="btn-minus">−</button>
+                <div class="bet-input-wrapper">
+                    <label>Bet Amount</label>
+                    <div>
+                        <span>$</span>
+                        <input type="number" id="bet-amount" value="50.00" min="1.00" step="5.00">
+                    </div>
+                </div>
+                <button class="btn-circle" id="btn-plus">+</button>
+            </div>
+            
+            <button id="btn-action" class="btn-green">
+                <span id="action-title">BET</span>
+                <span id="action-subtitle" class="btn-subtext">50.00 USD</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- SUPABASE CDN LIBRARY -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // ==========================================
+        // 1. SUPABASE CONFIGURATION
+        // ==========================================
+        const SUPABASE_URL = 'https://uijafeedhawjlnppmhmc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpamFmZWVkaGF3amxucHBtaG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTQzMzQsImV4cCI6MjA5MjMzMDMzNH0.phOvqK1nUkQARhVjp1T-GOEf3wnTYN7rZCPhIxPIzBQ';
+        
+        let supabase;
+        try {
+            supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        } catch(e) {
+            console.error("Supabase Config Error. Please add your credentials.");
+        }
+
+        // ==========================================
+        // 2. DOM ELEMENTS
+        // ==========================================
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const planeContainer = document.getElementById('plane-container');
+        const planeSvg = planeContainer.querySelector('svg');
+        const multiplierDisplay = document.getElementById('multiplier-display');
+        const statusMessage = document.getElementById('status-message');
+        const balanceDisplay = document.getElementById('balance');
+        const loadingContainer = document.getElementById('loading-container');
+        const timeLeftDisplay = document.getElementById('time-left');
+        const loadingBarFill = document.getElementById('loading-bar-fill');
+        const betInput = document.getElementById('bet-amount');
+        const btnMinus = document.getElementById('btn-minus');
+        const btnPlus = document.getElementById('btn-plus');
+        const btnAction = document.getElementById('btn-action');
+        const actionTitle = document.getElementById('action-title');
+        const actionSubtitle = document.getElementById('action-subtitle');
+        const gameArea = document.getElementById('game-area');
+
+        // ==========================================
+        // 3. GAME STATE VARIABLES
+        // ==========================================
+        let sysState = 'WAITING'; // SERVER STATE: WAITING, FLYING, CRASHED
+        let userState = 'IDLE';   // USER STATE: IDLE, PLACED, PLAYING, CASHED_OUT
+        
+        let balance = 3000.00; // Will be loaded from DB
+        let currentBet = 50.00;
+        let activeBet = 0; 
+        
+        let currentMultiplier = 1.00;
+        let serverTimeLeft = 10;
+        let animationFrameId;
+        let points = [];
+        let gridOffsetX = 0;
+        let localElapsed = 0; // For smooth drawing
+
+        // ==========================================
+        // 4. CANVAS SETUP & DRAWING LOGIC
+        // ==========================================
+        let W, H;
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            W = canvas.width;
+            H = canvas.height;
+            ctx.scale(dpr, dpr);
+            W /= dpr;
+            H /= dpr;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        function drawGrid(moveSpeed = 0) {
+            ctx.clearRect(0, 0, W, H);
+            gridOffsetX -= moveSpeed;
+            const gridSize = 40;
+            if (gridOffsetX <= -gridSize) gridOffsetX = 0;
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+            ctx.lineWidth = 1;
+            for (let x = gridOffsetX; x <= W; x += gridSize) {
+                if(x < 0) continue;
+                ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+            }
+            for (let y = 0; y <= H; y += gridSize) {
+                ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+            }
+        }
+
+        function drawCurve() {
+            if (points.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(0, H);
+            for (let i = 0; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+            const lastPoint = points[points.length - 1];
+            ctx.lineTo(lastPoint.x, H);
+            ctx.closePath();
+
+            const gradient = ctx.createLinearGradient(0, 0, 0, H);
+            gradient.addColorStop(0, 'rgba(233, 30, 99, 0.5)');
+            gradient.addColorStop(1, 'rgba(233, 30, 99, 0.0)');
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+            ctx.strokeStyle = sysState === 'CRASHED' ? '#dc3545' : '#e91e63';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.stroke();
+        }
+
+        function updatePlaneVisual(x, y, angle) {
+            planeContainer.style.left = `${x}px`;
+            planeContainer.style.top = `${y}px`;
+            planeContainer.style.transform = `translate(-10px, -50%) rotate(${angle}deg)`;
+            planeSvg.style.filter = sysState === 'CRASHED' ? 'grayscale(100%) brightness(50%)' : 'none';
+        }
+
+        // ==========================================
+        // 5. RENDER LOOP (VISUALS ONLY)
+        // ==========================================
+        function loop() {
+            if (sysState === 'WAITING') {
+                drawGrid(0);
+                updatePlaneVisual(20, H - 20, 0);
+            } 
+            else if (sysState === 'FLYING') {
+                localElapsed += 16; // Simulate ~60fps smooth moving
+                drawGrid(2 + (currentMultiplier * 0.5));
+                
+                const targetX = W * 0.8;
+                const targetY = H * 0.2;
+                const x = targetX * (1 - Math.exp(-localElapsed / 3000));
+                const y = H - (H - targetY) * (1 - Math.exp(-localElapsed / 4000));
+
+                points.push({x, y});
+
+                let angle = points.length > 2 ? 
+                    Math.atan2(points[points.length - 1].y - points[points.length - 3].y, points[points.length - 1].x - points[points.length - 3].x) * (180 / Math.PI) 
+                    : -15;
+
+                drawCurve();
+                updatePlaneVisual(x, y, angle);
+                
+                // Live UI updates while flying
+                multiplierDisplay.innerText = currentMultiplier.toFixed(2) + 'x';
+                updateActionBtn(); 
+            }
+            else if (sysState === 'CRASHED') {
+                drawGrid(0);
+                drawCurve();
+            }
+            animationFrameId = requestAnimationFrame(loop);
+        }
+
+        // ==========================================
+        // 6. UI UPDATERS
+        // ==========================================
+        function updateActionBtn() {
+            btnAction.className = ''; 
+            if (sysState === 'WAITING') {
+                if (userState === 'IDLE' || userState === 'CASHED_OUT') {
+                    btnAction.classList.add('btn-green');
+                    actionTitle.innerText = "BET";
+                    actionSubtitle.innerText = `${parseFloat(betInput.value).toFixed(2)} USD`;
+                } else if (userState === 'PLACED') {
+                    btnAction.classList.add('btn-red');
+                    actionTitle.innerText = "CANCEL";
+                    actionSubtitle.innerText = `Waiting for round`;
+                }
+            } 
+            else if (sysState === 'FLYING') {
+                if (userState === 'PLAYING') {
+                    btnAction.classList.add('btn-orange');
+                    actionTitle.innerText = "CASH OUT";
+                    let winAmount = (activeBet * currentMultiplier).toFixed(2);
+                    actionSubtitle.innerText = `${winAmount} USD`;
+                } else {
+                    btnAction.classList.add('btn-disabled');
+                    actionTitle.innerText = "WAITING";
+                    actionSubtitle.innerText = "Next Round";
+                }
+            }
+            else {
+                btnAction.classList.add('btn-disabled');
+                actionTitle.innerText = "WAITING";
+                actionSubtitle.innerText = "Next Round";
+            }
+        }
+
+        function createFloatingProfit(amount) {
+            const el = document.createElement('div');
+            el.className = 'profit-float';
+            el.innerText = `+$${amount.toFixed(2)}`;
+            el.style.left = `50%`;
+            el.style.top = `40%`;
+            gameArea.appendChild(el);
+            setTimeout(() => el.remove(), 1500);
+        }
+
+        // ==========================================
+        // 7. REALTIME SERVER COMMUNICATION
+        // ==========================================
+        function setupRealtime() {
+            if(!supabase) return;
+
+            const channel = supabase.channel('game-room');
+            channel.on('broadcast', { event: 'game_update' }, (payload) => {
+                const data = payload.payload;
+                
+                if(data.state === 'WAITING' && sysState !== 'WAITING') {
+                    sysState = 'WAITING';
+                    points = [];
+                    localElapsed = 0;
+                    multiplierDisplay.innerText = '1.00x';
+                    multiplierDisplay.className = 'text-white';
+                    statusMessage.style.opacity = 0;
+                    loadingContainer.style.opacity = 1;
+                    planeContainer.style.opacity = 1;
+                    planeContainer.style.transform = `translate(-10px, -50%) rotate(0deg)`;
+                    
+                    if (userState === 'PLAYING' || userState === 'CASHED_OUT') userState = 'IDLE';
+                    updateActionBtn();
+                }
+
+                if(data.state === 'WAITING') {
+                    timeLeftDisplay.innerText = data.timeLeft.toFixed(1);
+                    loadingBarFill.style.transform = `scaleX(${data.timeLeft / 10})`;
+                }
+                
+                if(data.state === 'FLYING') {
+                    if(sysState !== 'FLYING') {
+                        sysState = 'FLYING';
+                        loadingContainer.style.opacity = 0;
+                        if (userState === 'PLACED') userState = 'PLAYING';
+                    }
+                    currentMultiplier = data.multiplier; // Sync exact multiplier from server
+                }
+
+                if(data.state === 'CRASHED' && sysState !== 'CRASHED') {
+                    sysState = 'CRASHED';
+                    multiplierDisplay.className = 'text-red shake';
+                    statusMessage.innerText = `FLEW AWAY @ ${data.crashPoint.toFixed(2)}x`;
+                    statusMessage.className = 'text-red';
+                    statusMessage.style.opacity = 1;
+                    
+                    planeContainer.style.transition = 'transform 0.5s ease-in, opacity 0.3s ease';
+                    planeContainer.style.transform += ' translateX(200px) translateY(-100px)';
+                    planeContainer.style.opacity = 0;
+                    setTimeout(() => { planeContainer.style.transition = 'opacity 0.1s'; }, 500);
+
+                    if (userState === 'PLAYING') userState = 'IDLE'; // Player lost
+                    updateActionBtn();
+                }
+            }).subscribe();
+        }
+
+        // ==========================================
+        // 8. API ACTIONS (SECURE EDGE FUNCTIONS)
+        // ==========================================
+        async function placeBetOnServer(amount) {
+            if(!supabase) {
+                // FOR TESTING UI ONLY (Without Backend)
+                balance -= amount;
+                balanceDisplay.innerText = balance.toFixed(2);
+                userState = 'PLACED';
+                updateActionBtn();
+                return;
+            }
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if(!session) {
+                    // Fallback for local testing when not logged in
+                    balance -= amount;
+                    balanceDisplay.innerText = balance.toFixed(2);
+                    userState = 'PLACED';
+                    updateActionBtn();
+                    return;
+                }
+
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/crash-game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ action: 'place_bet', betAmount: amount })
+                });
+                
+                const result = await res.json();
+                if(result.success) {
+                    balance = result.newBalance;
+                    balanceDisplay.innerText = balance.toFixed(2);
+                    userState = 'PLACED';
+                    updateActionBtn();
+                } else alert("Error: " + result.error);
+            } catch(e) { console.error(e); }
+        }
+
+        async function cashOutOnServer() {
+            if(!supabase) {
+                // FOR TESTING UI ONLY (Without Backend)
+                let winAmount = activeBet * currentMultiplier;
+                balance += winAmount;
+                balanceDisplay.innerText = balance.toFixed(2);
+                userState = 'CASHED_OUT';
+                multiplierDisplay.className = 'text-green';
+                createFloatingProfit(winAmount);
+                updateActionBtn();
+                return;
+            }
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if(!session) {
+                    let winAmount = activeBet * currentMultiplier;
+                    balance += winAmount;
+                    balanceDisplay.innerText = balance.toFixed(2);
+                    userState = 'CASHED_OUT';
+                    multiplierDisplay.className = 'text-green';
+                    createFloatingProfit(winAmount);
+                    updateActionBtn();
+                    return;
+                }
+
+                const res = await fetch(`${SUPABASE_URL}/functions/v1/crash-game`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                    body: JSON.stringify({ action: 'cash_out', betAmount: activeBet, currentMultiplier })
+                });
+
+                const result = await res.json();
+                if(result.success) {
+                    balance = result.newBalance;
+                    balanceDisplay.innerText = balance.toFixed(2);
+                    userState = 'CASHED_OUT';
+                    multiplierDisplay.className = 'text-green';
+                    createFloatingProfit(result.winAmount);
+                    updateActionBtn();
+                }
+            } catch(e) { console.error(e); }
+        }
+
+        // ==========================================
+        // 9. EVENT LISTENERS & INIT
+        // ==========================================
+        btnMinus.addEventListener('click', () => {
+            let val = parseFloat(betInput.value);
+            if (val > 5) betInput.value = (val - 5).toFixed(2);
+            if (sysState === 'WAITING' && (userState === 'IDLE' || userState === 'CASHED_OUT')) updateActionBtn();
+        });
+
+        btnPlus.addEventListener('click', () => {
+            let val = parseFloat(betInput.value);
+            betInput.value = (val + 5).toFixed(2);
+            if (sysState === 'WAITING' && (userState === 'IDLE' || userState === 'CASHED_OUT')) updateActionBtn();
+        });
+
+        betInput.addEventListener('input', () => {
+            if (sysState === 'WAITING' && (userState === 'IDLE' || userState === 'CASHED_OUT')) updateActionBtn();
+        });
+
+        btnAction.addEventListener('click', () => {
+            if (sysState === 'WAITING' && (userState === 'IDLE' || userState === 'CASHED_OUT')) {
+                let val = parseFloat(betInput.value);
+                if(val > 0 && val <= balance) {
+                    activeBet = val;
+                    placeBetOnServer(val);
+                } else alert("Invalid bet amount or insufficient balance.");
+            } 
+            else if (sysState === 'FLYING' && userState === 'PLAYING') {
+                cashOutOnServer();
+            }
+            else if (sysState === 'WAITING' && userState === 'PLACED') {
+                // Cancel Bet logic (Local testing fallback)
+                userState = 'IDLE';
+                balance += activeBet;
+                activeBet = 0;
+                balanceDisplay.innerText = balance.toFixed(2);
+                updateActionBtn();
+            }
+        });
+
+        // Initialize
+        resizeCanvas();
+        balanceDisplay.innerText = balance.toFixed(2);
+        updateActionBtn();
+        setupRealtime();
+        animationFrameId = requestAnimationFrame(loop);
+
+    </script>
+</body>
+</html>

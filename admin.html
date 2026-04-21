@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Server (Admin)</title>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #111; color: white; text-align: center; padding: 50px; }
+        .box { background: #222; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; border: 2px solid #444; }
+        h1 { color: #00ff88; }
+        .data { font-size: 24px; font-weight: bold; margin: 20px 0; color: #ffeb3b; }
+        button { background: #e91e63; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
+        button:active { background: #c2185b; }
+        .status { margin-top: 15px; font-size: 14px; color: #aaa; }
+    </style>
+</head>
+<body>
+
+    <div class="box">
+        <h1>✈️ Auto Game Server</h1>
+        <p>Keep this page open to run the game.</p>
+        
+        <div class="data" id="display">Status: STOPPED</div>
+        
+        <button id="startBtn">START SERVER</button>
+        <div class="status" id="log">Waiting to start...</div>
+    </div>
+
+    <!-- Supabase Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        // আপনার Supabase কানেকশন
+        const SUPABASE_URL = 'https://uijafeedhawjlnppmhmc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpamFmZWVkaGF3amxucHBtaG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTQzMzQsImV4cCI6MjA5MjMzMDMzNH0.phOvqK1nUkQARhVjp1T-GOEf3wnTYN7rZCPhIxPIzBQ';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const channel = supabase.channel('game-room');
+
+        // UI Elements
+        const display = document.getElementById('display');
+        const startBtn = document.getElementById('startBtn');
+        const log = document.getElementById('log');
+
+        let isRunning = false;
+        let gameLoopTimer;
+
+        // Random Crash Point Generator
+        function generateCrashPoint() {
+            const r = Math.random();
+            let val = 0.99 / r;
+            if (val < 1.00) val = 1.00;
+            if (val > 100) val = 100; // Max 100x
+            return val;
+        }
+
+        // Broadcast to players
+        function sendUpdate(payload) {
+            channel.send({
+                type: 'broadcast',
+                event: 'game_update',
+                payload: payload
+            });
+        }
+
+        // --- THE GAME ENGINE ---
+        async function runGameEngine() {
+            // 1. WAITING PHASE (10 Seconds)
+            let timeLeft = 10.0;
+            display.innerText = "WAITING FOR PLAYERS...";
+            display.style.color = "#00ff88";
+
+            let waitInterval = setInterval(() => {
+                timeLeft -= 0.1;
+                sendUpdate({ state: 'WAITING', timeLeft: timeLeft });
+                if (timeLeft <= 0) {
+                    clearInterval(waitInterval);
+                    startFlying();
+                }
+            }, 100);
+        }
+
+        function startFlying() {
+            // 2. FLYING PHASE
+            let crashPoint = generateCrashPoint();
+            let currentMultiplier = 1.00;
+            let elapsed = 0;
+            
+            log.innerText = `Secret Crash Point: ${crashPoint.toFixed(2)}x`;
+            display.style.color = "#ffffff";
+
+            let flyInterval = setInterval(() => {
+                elapsed += 100;
+                // Aviator math formula
+                currentMultiplier = Math.exp(0.00008 * elapsed);
+                
+                if (currentMultiplier >= crashPoint) {
+                    clearInterval(flyInterval);
+                    startCrashed(crashPoint);
+                } else {
+                    display.innerText = `FLYING: ${currentMultiplier.toFixed(2)}x`;
+                    sendUpdate({ state: 'FLYING', multiplier: currentMultiplier });
+                }
+            }, 100);
+        }
+
+        function startCrashed(crashPoint) {
+            // 3. CRASHED PHASE (4 Seconds)
+            display.innerText = `CRASHED @ ${crashPoint.toFixed(2)}x`;
+            display.style.color = "#ff3b3b";
+            sendUpdate({ state: 'CRASHED', crashPoint: crashPoint });
+
+            setTimeout(() => {
+                if(isRunning) runGameEngine(); // Restart loop
+            }, 4000);
+        }
+
+        // Start Button Click
+        startBtn.addEventListener('click', () => {
+            if (!isRunning) {
+                isRunning = true;
+                startBtn.innerText = "STOP SERVER";
+                startBtn.style.background = "#555";
+                log.innerText = "Server is running online...";
+                channel.subscribe((status) => {
+                    if (status === 'SUBSCRIBED') {
+                        runGameEngine();
+                    }
+                });
+            } else {
+                isRunning = false;
+                startBtn.innerText = "START SERVER";
+                startBtn.style.background = "#e91e63";
+                display.innerText = "Status: STOPPED";
+                log.innerText = "Server stopped.";
+                channel.unsubscribe();
+                location.reload(); // Reload to reset completely
+            }
+        });
+
+    </script>
+</body>
+</html>
