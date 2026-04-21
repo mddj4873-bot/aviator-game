@@ -4,120 +4,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Server (Admin)</title>
+    <title>Pro Admin Panel - Aviator</title>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #111; color: white; text-align: center; padding: 50px; }
-        .box { background: #222; padding: 20px; border-radius: 10px; max-width: 400px; margin: 0 auto; border: 2px solid #444; }
-        h1 { color: #00ff88; }
-        .data { font-size: 24px; font-weight: bold; margin: 20px 0; color: #ffeb3b; }
-        button { background: #e91e63; color: white; border: none; padding: 15px 30px; font-size: 18px; border-radius: 5px; cursor: pointer; font-weight: bold; width: 100%; }
-        button:active { background: #c2185b; }
-        .status { margin-top: 15px; font-size: 14px; color: #aaa; }
-        #error-log { color: #ff3b3b; margin-top: 15px; font-size: 14px; font-weight: bold; }
+        body { font-family: Arial, sans-serif; background: #0f172a; color: white; padding: 15px; margin: 0; }
+        .panel { background: #1e293b; padding: 20px; border-radius: 12px; border: 1px solid #334155; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h2 { color: #38bdf8; text-align: center; margin-top: 0; }
+        h3 { color: #94a3b8; font-size: 16px; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+        .live-data { font-size: 2.5rem; color: #fbbf24; text-align: center; margin: 15px 0; font-weight: bold; }
+        button { width: 100%; padding: 18px; background: #10b981; color: white; border: none; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; transition: 0.2s; }
+        button:active { transform: scale(0.98); }
+        .btn-stop { background: #ef4444 !important; }
+        label { display: block; margin-top: 15px; font-size: 14px; color: #cbd5e1; font-weight: bold; }
+        select, input { width: 100%; padding: 12px; margin-top: 8px; background: #0f172a; color: white; border: 1px solid #334155; border-radius: 6px; font-size: 16px; box-sizing: border-box; }
+        #log { text-align: center; color: #94a3b8; font-size: 14px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>✈️ Auto Game Server</h1>
-        <p>Keep this page open to run the game.</p>
-        <div class="data" id="display">Status: STOPPED</div>
-        <button id="startBtn">START SERVER</button>
-        <div class="status" id="log">Waiting to start...</div>
-        <div id="error-log"></div>
+
+    <h2>⚙️ Game Control Panel</h2>
+
+    <div class="panel">
+        <h3>📡 Server Status</h3>
+        <div id="log">Click Start to Broadcast Game...</div>
+        <div class="live-data" id="display">STOPPED</div>
+        
+        <button id="startBtn" onclick="toggleServer()">🚀 START SERVER</button>
     </div>
 
-    <!-- Supabase Library -->
+    <div class="panel">
+        <h3>🎮 Winning Control (Admin Tool)</h3>
+        
+        <label>Game Result Mode:</label>
+        <select id="gameMode">
+            <option value="fair">Fair Random (Normal Play)</option>
+            <option value="house">House Edge (Make Players Lose Often)</option>
+            <option value="manual">Manual Force Crash (Targeted)</option>
+        </select>
+
+        <label>Manual Crash Point (For Manual Mode Only):</label>
+        <input type="number" id="manualPoint" value="1.50" step="0.01" min="1.00">
+    </div>
+
+    <!-- Supabase System -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
     <script>
-        const startBtn = document.getElementById('startBtn');
-        const display = document.getElementById('display');
-        const log = document.getElementById('log');
-        const errorLog = document.getElementById('error-log');
-
-        let isRunning = false;
+        const SUPABASE_URL = 'https://uijafeedhawjlnppmhmc.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpamFmZWVkaGF3amxucHBtaG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTQzMzQsImV4cCI6MjA5MjMzMDMzNH0.phOvqK1nUkQARhVjp1T-GOEf3wnTYN7rZCPhIxPIzBQ';
+        
         let supabase, channel;
+        let isRunning = false;
+        let engineTimer;
 
-        function showError(msg) {
-            errorLog.innerText = "Error: " + msg;
-            alert("System Message: " + msg);
-        }
+        // UI Elements
+        const display = document.getElementById('display');
+        const startBtn = document.getElementById('startBtn');
+        const log = document.getElementById('log');
 
-        // Initialize only when button is clicked (to prevent mobile browser blocking)
-        startBtn.addEventListener('click', () => {
-            try {
-                if (!window.supabase) {
-                    showError("Supabase is blocked by your browser. Please reload the page.");
-                    return;
-                }
-
-                if (!supabase) {
-                    const SUPABASE_URL = 'https://uijafeedhawjlnppmhmc.supabase.co';
-                    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVpamFmZWVkaGF3amxucHBtaG1jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY3NTQzMzQsImV4cCI6MjA5MjMzMDMzNH0.phOvqK1nUkQARhVjp1T-GOEf3wnTYN7rZCPhIxPIzBQ';
-                    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                    channel = supabase.channel('game-room');
-                }
-
-                if (!isRunning) {
-                    isRunning = true;
+        function toggleServer() {
+            if (!isRunning) {
+                // Start Server
+                try {
                     startBtn.innerText = "CONNECTING...";
-                    startBtn.style.background = "#555";
+                    startBtn.style.background = "#f59e0b";
                     
+                    if (!supabase) {
+                        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                        channel = supabase.channel('game-room');
+                    }
+
                     channel.subscribe((status) => {
-                        log.innerText = "Connection: " + status;
                         if (status === 'SUBSCRIBED') {
-                            startBtn.innerText = "STOP SERVER";
-                            log.innerText = "Server is running online...";
+                            isRunning = true;
+                            startBtn.innerText = "🛑 STOP SERVER";
+                            startBtn.classList.add("btn-stop");
+                            log.innerText = "Server is LIVE and broadcasting!";
                             runGameEngine();
-                        } else if (status === 'CHANNEL_ERROR') {
-                            showError("Failed to connect to Supabase. Check internet.");
-                            isRunning = false;
-                            startBtn.innerText = "START SERVER";
-                            startBtn.style.background = "#e91e63";
+                        } else {
+                            log.innerText = "Connecting error... Check internet.";
                         }
                     });
-                } else {
-                    isRunning = false;
-                    startBtn.innerText = "START SERVER";
-                    startBtn.style.background = "#e91e63";
-                    display.innerText = "Status: STOPPED";
-                    log.innerText = "Server stopped.";
-                    channel.unsubscribe();
-                    location.reload();
+                } catch(e) {
+                    alert("Error: " + e.message);
                 }
-            } catch (err) {
-                showError(err.message);
-            }
-        });
-
-        // The Game Math
-        function generateCrashPoint() {
-            const r = Math.random();
-            let val = 0.99 / r;
-            if (val < 1.00) val = 1.00;
-            if (val > 100) val = 100; 
-            return val;
-        }
-
-        function sendUpdate(payload) {
-            if(channel) {
-                channel.send({
-                    type: 'broadcast',
-                    event: 'game_update',
-                    payload: payload
-                }).catch(err => console.log("Broadcast error:", err));
+            } else {
+                // Stop Server
+                isRunning = false;
+                startBtn.innerText = "🚀 START SERVER";
+                startBtn.classList.remove("btn-stop");
+                startBtn.style.background = "#10b981";
+                display.innerText = "STOPPED";
+                display.style.color = "#fbbf24";
+                log.innerText = "Server offline.";
+                channel.unsubscribe();
+                clearTimeout(engineTimer);
             }
         }
 
-        async function runGameEngine() {
+        function getCrashPoint() {
+            let mode = document.getElementById('gameMode').value;
+            
+            if (mode === 'manual') {
+                let manualVal = parseFloat(document.getElementById('manualPoint').value);
+                return manualVal < 1.00 ? 1.00 : manualVal;
+            } 
+            else if (mode === 'house') {
+                // Low crash point: Forces crash between 1.00x and 2.50x mostly
+                return 1.00 + (Math.random() * 1.5);
+            } 
+            else {
+                // Fair Mode
+                const r = Math.random();
+                let val = 0.99 / r;
+                if (val < 1.00) val = 1.00;
+                if (val > 100) val = 100;
+                return val;
+            }
+        }
+
+        function sendData(data) {
+            if(channel) channel.send({ type: 'broadcast', event: 'game_update', payload: data });
+        }
+
+        function runGameEngine() {
+            if(!isRunning) return;
+            
             let timeLeft = 10.0;
-            display.innerText = "WAITING FOR PLAYERS...";
-            display.style.color = "#00ff88";
+            display.innerText = "WAITING...";
+            display.style.color = "#38bdf8";
 
             let waitInterval = setInterval(() => {
                 if(!isRunning) { clearInterval(waitInterval); return; }
                 timeLeft -= 0.1;
-                sendUpdate({ state: 'WAITING', timeLeft: timeLeft });
+                sendData({ state: 'WAITING', timeLeft: timeLeft });
+                
                 if (timeLeft <= 0) {
                     clearInterval(waitInterval);
                     startFlying();
@@ -126,12 +145,12 @@
         }
 
         function startFlying() {
-            let crashPoint = generateCrashPoint();
+            let crashPoint = getCrashPoint();
             let currentMultiplier = 1.00;
             let elapsed = 0;
             
-            log.innerText = `Secret Crash Point: ${crashPoint.toFixed(2)}x`;
-            display.style.color = "#ffffff";
+            log.innerText = `Secret Crash Target: ${crashPoint.toFixed(2)}x`;
+            display.style.color = "#10b981";
 
             let flyInterval = setInterval(() => {
                 if(!isRunning) { clearInterval(flyInterval); return; }
@@ -140,20 +159,21 @@
                 
                 if (currentMultiplier >= crashPoint) {
                     clearInterval(flyInterval);
-                    startCrashed(crashPoint);
+                    currentMultiplier = crashPoint; // lock to exact target
+                    startCrashed(currentMultiplier);
                 } else {
-                    display.innerText = `FLYING: ${currentMultiplier.toFixed(2)}x`;
-                    sendUpdate({ state: 'FLYING', multiplier: currentMultiplier });
+                    display.innerText = `${currentMultiplier.toFixed(2)}x`;
+                    sendData({ state: 'FLYING', multiplier: currentMultiplier });
                 }
             }, 100);
         }
 
         function startCrashed(crashPoint) {
             display.innerText = `CRASHED @ ${crashPoint.toFixed(2)}x`;
-            display.style.color = "#ff3b3b";
-            sendUpdate({ state: 'CRASHED', crashPoint: crashPoint });
+            display.style.color = "#ef4444";
+            sendData({ state: 'CRASHED', crashPoint: crashPoint });
 
-            setTimeout(() => {
+            engineTimer = setTimeout(() => {
                 if(isRunning) runGameEngine(); 
             }, 4000);
         }
